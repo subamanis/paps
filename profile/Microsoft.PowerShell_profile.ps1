@@ -25,6 +25,10 @@ Set-PSReadLineOption -AddToHistoryHandler {
         return $default
     }
 
+    if ($line -match 'Bearer\s+[A-Za-z0-9._~+/=-]{12,}|\b(gh[pousr]_|github_pat_)[A-Za-z0-9_]{20,}|\bsk-[A-Za-z0-9_-]{16,}|\bxox[abprs]-[A-Za-z0-9-]{10,}|\bAKIA[0-9A-Z]{16}\b|\bAIza[0-9A-Za-z_-]{35}\b|\bglpat-[A-Za-z0-9_-]{16,}|(api[_-]?key|auth[_-]?token|access[_-]?token|x-api-key)\s*[:=]\s*\S{8,}') {
+        return [Microsoft.PowerShell.AddToHistoryOption]::MemoryOnly
+    }
+
     try {
         $ast = [System.Management.Automation.Language.Parser]::ParseInput($line, [ref] $null, [ref] $null)
         $command = $ast.Find({ param($node) $node -is [System.Management.Automation.Language.CommandAst] }, $true)

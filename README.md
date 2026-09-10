@@ -95,4 +95,6 @@ Set-PSReadLineOption -PredictionSource Plugin
 
 Χτίζεται πάνω στο `GetDefaultAddToHistoryOption`, οπότε το φίλτρο μυστικών του PSReadLine μένει ενεργό: το `$token = "ghp_..."` γίνεται `MemoryOnly` και δεν αγγίζει τον δίσκο.
 
+Το ενσωματωμένο φίλτρο ψάχνει `password|asplaintext|token|apikey|secret` σε θέση ανάθεσης ή παραμέτρου, οπότε ένα `curl -H "Authorization: Bearer ..."` του ξεφεύγει. Από πάνω μπαίνει ένα δεύτερο πέρασμα για σχήματα διαπιστευτηρίων όπου κι αν βρίσκονται μέσα στη γραμμή: `Bearer`, `ghp_`, `github_pat_`, `sk-`, `xox[abprs]-`, `AKIA`, `AIza`, `glpat-`, και header σαν το `X-Api-Key:`. Δοκιμασμένο πάνω σε 4334 πραγματικές γραμμές ιστορικού με μηδέν ψευδώς θετικά.
+
 Κόστος: 1 ms σε σωστή εντολή, 20 ms σε typo.
