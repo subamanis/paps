@@ -101,6 +101,8 @@ namespace ContextHistoryPredictor
 
         private const int MinimumInput = 2;
 
+        private const int MaximumExtension = 5;
+
         private static readonly Guid _id = new Guid(Identifier);
 
         private static readonly object _gate = new object();
@@ -230,7 +232,7 @@ namespace ContextHistoryPredictor
                 {
                     reach = Reach.Here;
                 }
-                else if (MustBeAPath(token))
+                else if (MustBeAPath(token, location, probed))
                 {
                     return Reach.Elsewhere;
                 }
@@ -251,17 +253,78 @@ namespace ContextHistoryPredictor
                 return false;
             }
 
+            if (token.IndexOf('@') >= 0)
+            {
+                return false;
+            }
+
             return token.IndexOf('/') >= 0 || token.IndexOf('\\') >= 0;
         }
 
-        private static bool MustBeAPath(string token)
+        private static bool MustBeAPath(string token, string location, Dictionary<string, bool> probed)
         {
             if (token.IndexOf('\\') >= 0 || Path.IsPathRooted(token))
             {
                 return true;
             }
 
-            return token.StartsWith("./", StringComparison.Ordinal) || token.StartsWith("../", StringComparison.Ordinal);
+            if (token.StartsWith("./", StringComparison.Ordinal) || token.StartsWith("../", StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            if (HasFileExtension(token))
+            {
+                return true;
+            }
+
+            return HasResolvingAncestor(token, location, probed);
+        }
+
+        private static bool HasFileExtension(string token)
+        {
+            int slash = token.LastIndexOf('/');
+            string last = slash >= 0 ? token.Substring(slash + 1) : token;
+            int dot = last.LastIndexOf('.');
+
+            if (dot <= 0 || dot == last.Length - 1)
+            {
+                return false;
+            }
+
+            string extension = last.Substring(dot + 1);
+
+            if (extension.Length > MaximumExtension)
+            {
+                return false;
+            }
+
+            foreach (char letter in extension)
+            {
+                if (!char.IsLetter(letter))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static bool HasResolvingAncestor(string token, string location, Dictionary<string, bool> probed)
+        {
+            int slash = token.IndexOf('/');
+
+            while (slash > 0)
+            {
+                if (Exists(token.Substring(0, slash), location, probed))
+                {
+                    return true;
+                }
+
+                slash = token.IndexOf('/', slash + 1);
+            }
+
+            return false;
         }
 
         private static bool Exists(string token, string location, Dictionary<string, bool> probed)

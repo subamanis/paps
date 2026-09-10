@@ -40,14 +40,19 @@ D:\dev\paps\setup.ps1
 
 Πώς αποφασίζει, για κάθε υποψήφια γραμμή:
 
-| Το token | Υπάρχει κάτω από το cwd; | Απόφαση |
+| Το token | Κρίση | Απόφαση |
 |---|---|---|
-| `.\target\release\b.exe` | όχι | έξω |
-| `.\target\release\a.exe` | ναι | μέσα, και πρώτο |
-| `cargo build --release` | δεν έχει path | μέσα, ισχύει παντού |
-| `feature/new-thing` | δεν φαίνεται σίγουρα path | μέσα, μπορεί να είναι git branch |
+| `.\target\release\a.exe` | path, και υπάρχει εδώ | μέσα, και πρώτο |
+| `.\target\release\b.exe` | path, λείπει από εδώ | έξω |
+| `target/release/b.exe` | κατάληξη από γράμματα, λείπει | έξω |
+| `target/debug/deps` | το `target` υπάρχει, το ολόκληρο όχι | έξω |
+| `cargo build --release` | κανένα path | μέσα, ισχύει παντού |
+| `feature/new-thing` | χωρίς κατάληξη, χωρίς πρόγονο που να λύνεται | μέσα, μπορεί να είναι git branch |
+| `git@github.com:me/repo.git` | έχει `@`, είναι SSH URL | μέσα |
 
-Η τελευταία γραμμή είναι σκόπιμη. Ένα token με forward slash που δεν ξεκινάει με `./` και δεν έχει backslash μένει, ώστε τα ονόματα των branch να μη θεωρούνται χαμένα paths.
+Ένα token θεωρείται σίγουρα path όταν ισχύει ένα από τα εξής: έχει backslash, είναι rooted, ξεκινάει με `./`, το τελευταίο του κομμάτι έχει κατάληξη από γράμματα, ή κάποιος πρόγονός του λύνεται σαν φάκελος εκεί που στέκεσαι. Μόνο τότε η απουσία του από τον δίσκο κόβει τη γραμμή.
+
+Το `@` εξαιρείται πριν από όλα αυτά, γιατί πιάνει τα SSH URL και τα `@(...)` array literal του PowerShell που κουβαλάνε paths μέσα τους.
 
 Ο cwd φτάνει στον predictor μέσω `LocationChangedAction`, γιατί το process current directory δεν ακολουθεί το `Set-Location` και ο predictor τρέχει σε δικό του νήμα.
 
