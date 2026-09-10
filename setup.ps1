@@ -93,16 +93,21 @@ function Build-Predictor {
 }
 
 function Install-File($source, $target) {
-    if (Test-Path $target) {
-        $existing = Get-Item $target -Force
+    $existing = Get-Item $target -Force -ErrorAction Ignore
 
-        if ($existing.LinkType -eq 'SymbolicLink' -and $existing.LinkTarget -eq $source) {
-            Write-Host "  $(Split-Path $target -Leaf) is already linked"
-            return
+    if ($existing) {
+        if ($existing.LinkType -eq 'SymbolicLink') {
+            if ($existing.LinkTarget -eq $source) {
+                Write-Host "  $(Split-Path $target -Leaf) is already linked"
+                return
+            }
+
+            Remove-Item $target -Force
         }
-
-        Copy-Item $target "$target.bak" -Force
-        Remove-Item $target -Force
+        else {
+            Copy-Item $target "$target.bak" -Force
+            Remove-Item $target -Force
+        }
     }
 
     if ($CopyProfile) {

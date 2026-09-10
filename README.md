@@ -1,10 +1,12 @@
-# PowerShell setup
+# paps
+
+**P**etros' **A**wesome **P**owerShell **S**etup.
 
 Το PowerShell 7 setup μου, μαζεμένο ώστε ένα καινούριο μηχάνημα να στήνεται με μία εντολή.
 
 ```powershell
-git clone <this repo> D:\dev\Powershell
-D:\dev\Powershell\setup.ps1
+git clone https://github.com/subamanis/paps.git D:\dev\paps
+D:\dev\paps\setup.ps1
 ```
 
 Το `setup.ps1` είναι idempotent, το ξανατρέχεις όποτε θες. Παραλείπει ό,τι υπάρχει ήδη.
