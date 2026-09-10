@@ -1,17 +1,15 @@
-# PowerShell Cheatsheet
+# Cheatsheet
 
 ## Navigation
 
-| Command | Τι κάνει |
+| Command | Does |
 |---|---|
-| `z <name>` | Πηγαίνει σε directory που έχεις επισκεφθεί |
-| `zi` | Διαδραστική επιλογή από τα directories του zoxide |
-| `cdd [query]` | Fuzzy επιλογή directory και μετά σε πηγαίνει εκεί |
-| `ll` | Αναλυτικό listing |
-| `la` | Listing μαζί με hidden files |
-| `lt` | Directory tree, 2 επίπεδα |
-
-### Παραδείγματα
+| `z <name>` | Jump to a directory you have visited |
+| `zi` | Pick interactively from zoxide's directories |
+| `cdd [query]` | Fuzzy pick a directory and go there |
+| `ll` | Long listing |
+| `la` | Long listing with hidden files |
+| `lt` | Directory tree, 2 levels |
 
 ```
 z mezura
@@ -21,13 +19,11 @@ cdd mezura
 
 ## Search
 
-| Command | Τι κάνει |
+| Command | Does |
 |---|---|
-| `rg <text>` | Ψάχνει κείμενο μέσα στα αρχεία |
-| `fd <name>` | Ψάχνει αρχεία και directories |
-| `fzf` | Διαδραστική fuzzy επιλογή από λίστα |
-
-### Παραδείγματα
+| `rg <text>` | Search text inside files |
+| `fd <name>` | Search files and directories |
+| `fzf` | Interactive fuzzy pick from a list |
 
 ```
 rg "parse_lines" .
@@ -36,13 +32,11 @@ fd "Cargo.toml"
 
 ## Files
 
-| Command | Τι κάνει |
+| Command | Does |
 |---|---|
-| `bat <file>` | Προβολή αρχείου με syntax highlighting και line numbers |
-| `open [query]` | Fuzzy επιλογή αρχείου και άνοιγμα με το default Windows app |
-| `code <file>` | Άνοιγμα αρχείου στο VS Code |
-
-### Παραδείγματα
+| `bat <file>` | View a file with syntax highlighting and line numbers |
+| `open [query]` | Fuzzy pick a file and open it with the default app |
+| `code <file>` | Open a file in VS Code |
 
 ```
 open
@@ -52,52 +46,52 @@ bat src/parser.rs
 
 ## Shortcuts
 
-| Shortcut | Τι κάνει |
+| Key | Does |
 |---|---|
-| `Ctrl+R` | Fuzzy αναζήτηση στο history |
-| `Ctrl+T` | Fuzzy επιλογή αρχείου, το κολλάει στη γραμμή |
-| `Alt+C` | Fuzzy επιλογή directory, σε πηγαίνει εκεί |
-| `RightArrow` | Δέχεται την πρόταση που βλέπεις |
-| `F2` | Εναλλαγή ανάμεσα σε ListView και InlineView |
+| `Ctrl+R` | Fuzzy search history |
+| `Ctrl+T` | Fuzzy pick a file, paste it on the line |
+| `Alt+C` | Fuzzy pick a directory, go there |
+| `RightArrow` | Accept the suggestion shown |
+| `F2` | Toggle ListView and InlineView |
 
 ## Predictions
 
-Η λίστα κάτω από τη γραμμή έρχεται από δύο πηγές, με το όνομα της καθεμιάς δεξιά.
+The list under the line comes from two sources, each named on the right.
 
-| Πηγή | Τι δίνει |
+| Source | Gives |
 |---|---|
-| `ContextHistory` | Ιστορικό, φιλτραρισμένο ώστε να μη σου προτείνει paths άλλου project |
-| `Completion` | Ό,τι υπάρχει στον τρέχοντα φάκελο, μέσω tab completion |
+| `ContextHistory` | History, filtered so it never offers another project's paths |
+| `Completion` | What is in the current directory, via tab completion |
 
-Το `Completion` δεν απαντάει όταν γράφεις την **πρώτη** λέξη της γραμμής. Γράψε πρώτα το ρήμα και μετά το όρισμα:
+`Completion` stays quiet on the **first** word of a line. Type the verb first:
 
 ```
-cd targ      δουλεύει
-cat pyr      δουλεύει
-pyr          δεν βγάζει τίποτα
-.\pyr        δουλεύει με Tab
+cd targ      works
+cat pyr      works
+pyr          nothing
+.\pyr        works with Tab
 ```
 
 ## History
 
-Το ιστορικό αυτοκαθαρίζεται σε δύο σημεία.
+Cleans itself in two places.
 
-**Στην πληκτρολόγηση.** Μια εντολή που δεν υπάρχει δεν μπαίνει καθόλου στο ιστορικό. Ένα `cagro build` γράφεται και ξεχνιέται.
+**On typing.** A command that does not exist is never recorded. `cagro build` runs and is forgotten.
 
-**Στο άνοιγμα.** Όταν το αρχείο ξεπεράσει το 1 MB και δεν τρέχει άλλο shell, κόβεται: μένει ό,τι έτρεξες 2+ φορές συν οι τελευταίες 1000 γραμμές.
+**On startup.** Past 1 MB with no other shell running, the file is trimmed: everything run twice or more, plus the last 1000 lines.
 
-Γραμμές που μοιάζουν να έχουν μυστικά (`$token = "..."`) μένουν στη μνήμη της session και δεν γράφονται στον δίσκο.
+Lines that look like they carry credentials stay in session memory and never hit disk.
 
-## Quick Reference
+## Quick reference
 
 ```
-z            → γρήγορη μετάβαση σε γνωστό directory
-cdd [query]  → fuzzy επιλογή directory
-ll / la      → directory listing
-lt           → directory tree
-rg           → αναζήτηση κειμένου
-fd           → αναζήτηση αρχείων
-bat          → προβολή αρχείων
-open [query] → fuzzy επιλογή και άνοιγμα αρχείου
-fzf          → fuzzy επιλογή
+z            jump to a known directory
+cdd [query]  fuzzy pick a directory
+ll / la      directory listing
+lt           directory tree
+rg           search text
+fd           search files
+bat          view files
+open [query] fuzzy pick and open a file
+fzf          fuzzy pick
 ```

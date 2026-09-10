@@ -1,100 +1,73 @@
 # paps
 
-**P**etros' **A**wesome **P**owerShell **S**etup.
+PowerShell 7 setup: tools, profile, and a PSReadLine predictor that filters history by the directory you are in.
 
-Το PowerShell 7 setup μου, μαζεμένο ώστε ένα καινούριο μηχάνημα να στήνεται με μία εντολή.
+## Install
 
 ```powershell
 git clone https://github.com/subamanis/paps.git D:\dev\Powershell\paps
 D:\dev\Powershell\paps\setup.ps1
 ```
 
-Το `setup.ps1` είναι idempotent, το ξανατρέχεις όποτε θες. Παραλείπει ό,τι υπάρχει ήδη.
+Idempotent. Skips whatever is already there.
 
-| Flag | Τι κάνει |
+| Flag | Effect |
 |---|---|
-| `-SkipTools` | Δεν αγγίζει το winget, μόνο modules και profile |
-| `-CopyProfile` | Αντιγράφει το profile. Χωρίς αυτό φτιάχνει symlink, ώστε οι αλλαγές να γυρνάνε στο repo |
+| `-SkipTools` | Leave winget alone, do modules and profile only |
+| `-CopyProfile` | Copy the profile instead of symlinking it |
 
-Το symlink θέλει Developer Mode ή elevation. Αν αποτύχει, πέφτει μόνο του σε αντιγραφή και σου το λέει.
+Symlinks need Developer Mode or one elevated run. Without either, setup copies and says so.
 
-## Τι μπαίνει
+## What it installs
 
-**Εργαλεία** (winget): `zoxide`, `fzf`, `fd`, `eza`, `ripgrep`, `bat`
+winget: `zoxide` `fzf` `fd` `eza` `ripgrep` `bat`
+Gallery: `CompletionPredictor` `Terminal-Icons`
+Built here: `ContextHistoryPredictor`
 
-**Modules** (gallery): `CompletionPredictor`, `Terminal-Icons`
+## ContextHistoryPredictor
 
-**Modules** (χτίζονται εδώ): `ContextHistoryPredictor`
+PSReadLine's own history ignores where you are. In project A you type `.\ta` and it offers `.\target\release\b.exe` from project B, which cannot even run there.
 
-## Τα κομμάτια
+This predictor drops those. Per candidate line, per token:
 
-### `profile/`
-
-Το `Microsoft.PowerShell_profile.ps1`. Πηγαίνει στο `$PROFILE`.
-
-### `predictor/`
-
-Ένας PSReadLine predictor σε C# που φιλτράρει το ιστορικό με βάση τον φάκελο που είσαι.
-
-Το πρόβλημα που λύνει: το ενσωματωμένο ιστορικό του PSReadLine αγνοεί το πού στέκεσαι. Στο project A γράφεις `.\ta` και σου προτείνει το `.\target\release\b.exe` του project B, που από εκεί δεν τρέχει καν.
-
-Πώς αποφασίζει, για κάθε υποψήφια γραμμή:
-
-| Το token | Κρίση | Απόφαση |
+| Token | Verdict | Result |
 |---|---|---|
-| `.\target\release\a.exe` | path, και υπάρχει εδώ | μέσα, και πρώτο |
-| `.\target\release\b.exe` | path, λείπει από εδώ | έξω |
-| `target/release/b.exe` | κατάληξη από γράμματα, λείπει | έξω |
-| `target/debug/deps` | το `target` υπάρχει, το ολόκληρο όχι | έξω |
-| `cargo build --release` | κανένα path | μέσα, ισχύει παντού |
-| `feature/new-thing` | χωρίς κατάληξη, χωρίς πρόγονο που να λύνεται | μέσα, μπορεί να είναι git branch |
-| `git@github.com:me/repo.git` | έχει `@`, είναι SSH URL | μέσα |
+| `.\target\release\a.exe` | path, exists here | keep, rank first |
+| `.\target\release\b.exe` | path, missing here | drop |
+| `target/release/b.exe` | letter extension, missing | drop |
+| `target/debug/deps` | `target` exists, full path does not | drop |
+| `cargo build --release` | no path | keep, valid anywhere |
+| `feature/new-thing` | no extension, no resolving ancestor | keep, may be a git branch |
+| `git@github.com:me/repo.git` | has `@`, SSH URL | keep |
 
-Ένα token θεωρείται σίγουρα path όταν ισχύει ένα από τα εξής: έχει backslash, είναι rooted, ξεκινάει με `./`, το τελευταίο του κομμάτι έχει κατάληξη από γράμματα, ή κάποιος πρόγονός του λύνεται σαν φάκελος εκεί που στέκεσαι. Μόνο τότε η απουσία του από τον δίσκο κόβει τη γραμμή.
+A token counts as a path when it has a backslash, is rooted, starts with `./`, ends in a letters-only extension, or has an ancestor that resolves as a directory here. Only then does its absence drop the line. Tokens containing `@` are skipped: SSH URLs and PowerShell `@(...)` literals.
 
-Το `@` εξαιρείται πριν από όλα αυτά, γιατί πιάνει τα SSH URL και τα `@(...)` array literal του PowerShell που κουβαλάνε paths μέσα τους.
+Matching finds your text anywhere in the line, same as PSReadLine's built-in source. Lines matching from the start rank first. Quoted paths with spaces read as one token. Backtick continuations join into one line.
 
-Το ταίριασμα ψάχνει το κείμενό σου **οπουδήποτε** μέσα στη γραμμή, όπως έκανε και η ενσωματωμένη πηγή του PSReadLine. Όσες ταιριάζουν από την αρχή έρχονται πρώτες.
+Location reaches the predictor through `LocationChangedAction`, since the process working directory does not follow `Set-Location` and the predictor runs off-thread.
 
-Δύο ακόμα λεπτομέρειες στην ανάγνωση: ένα path μέσα σε εισαγωγικά διαβάζεται ολόκληρο ακόμα κι αν έχει κενά, και οι πολυγραμμικές εντολές με backtick ενώνονται σε μία ισοδύναμη γραμμή.
+Targets `net8.0` though PowerShell 7.6 runs on .NET 10, so no .NET 10 SDK needed.
 
-Ο cwd φτάνει στον predictor μέσω `LocationChangedAction`, γιατί το process current directory δεν ακολουθεί το `Set-Location` και ο predictor τρέχει σε δικό του νήμα.
+Measured 0.08 ms per keystroke over 4334 history lines, worst case 1.1 ms. PSReadLine allows plugin predictors 20 ms.
 
-Χτίζεται σε `net8.0` παρόλο που το PowerShell 7.6 τρέχει σε .NET 10, ώστε να μη χρειάζεται το .NET 10 SDK. Φορτώνει κανονικά.
+## scripts/trim-history.ps1
 
-Μετρημένο: **0.043 ms** ανά πάτημα πλήκτρου πάνω σε αρχείο 4334 γραμμών. Το PSReadLine δίνει 20 ms στα plugin predictors.
+PSReadLine never trims `ConsoleHost_history.txt`. This does, called from the profile.
 
-### `scripts/trim-history.ps1`
+Keeps every line run twice or more, plus the last 1000. Duplicates stay: they are the frequency count.
 
-Κόβει το `ConsoleHost_history.txt`, που το PSReadLine δεν καθαρίζει ποτέ μόνο του. Πηγαίνει στο `Scripts/` δίπλα στο profile και το καλεί το profile.
+Two guards: does nothing under 1 MB, does nothing while another shell is running. The second matters because PSReadLine seeks to a stored file size to read what other windows wrote, and a shrinking file lands that seek past the end.
 
-Κρατάει ό,τι έτρεξες 2+ φορές, συν τις τελευταίες 1000 γραμμές. Οι επαναλήψεις μένουν μέσα, γιατί αυτές είναι η μέτρηση της συχνότητας.
+## History hygiene
 
-Δύο φρουροί στην αρχή: δεν κάνει τίποτα κάτω από 1 MB, και δεν κάνει τίποτα αν τρέχει άλλο shell. Ο δεύτερος υπάρχει επειδή το PSReadLine κρατάει το μέγεθος του αρχείου σε μετρητή και κάνει `Seek` σε αυτό για να διαβάσει τι γράφουν τα άλλα παράθυρα. Αν το αρχείο μικρύνει από κάτω τους, το seek προσγειώνεται πέρα από το τέλος.
+`AddToHistoryHandler` runs before execution. It reads the command name off the AST and asks `Get-Command`. Missing command, the line is never recorded. `cagro build` runs and is forgotten.
 
-### `docs/cheatsheet.md`
+Built on `GetDefaultAddToHistoryOption`, so PSReadLine's own secret filter stays live: `$token = "ghp_..."` becomes `MemoryOnly`.
 
-Τι κάνει η κάθε εντολή και το κάθε shortcut.
+That filter looks for `password|asplaintext|token|apikey|secret` in assignment or parameter position, so `curl -H "Authorization: Bearer ..."` slips past. A second pass catches credential shapes anywhere in the line: `Bearer`, `ghp_`, `github_pat_`, `sk-`, `xox[abprs]-`, `AKIA`, `AIza`, `glpat-`, and headers like `X-Api-Key:`. Zero false positives over 4334 real history lines.
 
-## Το prediction setup
+Cost: 1 ms on a valid command, 20 ms on a typo.
 
-```powershell
-Set-PSReadLineOption -PredictionSource Plugin
-```
+## docs/cheatsheet.md
 
-`Plugin`, ώστε να σβήσει η ενσωματωμένη πηγή ιστορικού. Η λίστα έρχεται από δύο plugins:
-
-- `ContextHistory` για το ιστορικό, φιλτραρισμένο κατά φάκελο
-- `Completion` για ό,τι είναι στον τρέχοντα φάκελο, μέσω της μηχανής του tab completion
-
-Το `CompletionPredictor` δεν απαντάει στην πρώτη λέξη της γραμμής. Είναι σκόπιμο: εκεί το completion σαρώνει όλο το PATH και μετρήθηκε στα 53 ms, πάνω από το budget των 20 ms.
-
-## Υγιεινή του ιστορικού
-
-Το profile βάζει `AddToHistoryHandler` που πετάει τα typos πριν γραφτούν. Παίρνει το όνομα της εντολής από το AST και ρωτάει `Get-Command`. Αν δεν υπάρχει, η γραμμή δεν μπαίνει ούτε στη μνήμη ούτε στο αρχείο.
-
-Χτίζεται πάνω στο `GetDefaultAddToHistoryOption`, οπότε το φίλτρο μυστικών του PSReadLine μένει ενεργό: το `$token = "ghp_..."` γίνεται `MemoryOnly` και δεν αγγίζει τον δίσκο.
-
-Το ενσωματωμένο φίλτρο ψάχνει `password|asplaintext|token|apikey|secret` σε θέση ανάθεσης ή παραμέτρου, οπότε ένα `curl -H "Authorization: Bearer ..."` του ξεφεύγει. Από πάνω μπαίνει ένα δεύτερο πέρασμα για σχήματα διαπιστευτηρίων όπου κι αν βρίσκονται μέσα στη γραμμή: `Bearer`, `ghp_`, `github_pat_`, `sk-`, `xox[abprs]-`, `AKIA`, `AIza`, `glpat-`, και header σαν το `X-Api-Key:`. Δοκιμασμένο πάνω σε 4334 πραγματικές γραμμές ιστορικού με μηδέν ψευδώς θετικά.
-
-Κόστος: 1 ms σε σωστή εντολή, 20 ms σε typo.
+Commands and shortcuts.
