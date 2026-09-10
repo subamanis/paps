@@ -5,8 +5,8 @@
 Το PowerShell 7 setup μου, μαζεμένο ώστε ένα καινούριο μηχάνημα να στήνεται με μία εντολή.
 
 ```powershell
-git clone https://github.com/subamanis/paps.git D:\dev\paps
-D:\dev\paps\setup.ps1
+git clone https://github.com/subamanis/paps.git D:\dev\Powershell\paps
+D:\dev\Powershell\paps\setup.ps1
 ```
 
 Το `setup.ps1` είναι idempotent, το ξανατρέχεις όποτε θες. Παραλείπει ό,τι υπάρχει ήδη.
