@@ -33,21 +33,35 @@ namespace ContextHistoryPredictor
             }
 
             string[] lines = ReadHistory();
-            List<PredictiveSuggestion> here = new List<PredictiveSuggestion>();
-            List<PredictiveSuggestion> anywhere = new List<PredictiveSuggestion>();
+            List<PredictiveSuggestion> hereOpening = new List<PredictiveSuggestion>();
+            List<PredictiveSuggestion> hereInside = new List<PredictiveSuggestion>();
+            List<PredictiveSuggestion> anywhereOpening = new List<PredictiveSuggestion>();
+            List<PredictiveSuggestion> anywhereInside = new List<PredictiveSuggestion>();
             HashSet<string> seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             Dictionary<string, bool> probed = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
 
             for (int i = lines.Length - 1; i >= 0; i--)
             {
-                if (cancellationToken.IsCancellationRequested || here.Count + anywhere.Count >= Limit)
+                if (cancellationToken.IsCancellationRequested || hereOpening.Count + hereInside.Count >= Limit)
                 {
                     break;
                 }
 
                 string line = lines[i];
 
-                if (line.Length <= input.Length || !line.StartsWith(input, StringComparison.OrdinalIgnoreCase) || !seen.Add(line))
+                if (line.Length <= input.Length)
+                {
+                    continue;
+                }
+
+                bool opening = line.StartsWith(input, StringComparison.OrdinalIgnoreCase);
+
+                if (!opening && line.IndexOf(input, StringComparison.OrdinalIgnoreCase) < 0)
+                {
+                    continue;
+                }
+
+                if (!seen.Add(line))
                 {
                     continue;
                 }
@@ -59,24 +73,37 @@ namespace ContextHistoryPredictor
                     continue;
                 }
 
-                if (reach == Reach.Here)
+                List<PredictiveSuggestion> bucket = reach == Reach.Here
+                    ? (opening ? hereOpening : hereInside)
+                    : (opening ? anywhereOpening : anywhereInside);
+
+                if (bucket.Count < Limit)
                 {
-                    here.Add(new PredictiveSuggestion(line));
-                }
-                else
-                {
-                    anywhere.Add(new PredictiveSuggestion(line));
+                    bucket.Add(new PredictiveSuggestion(line));
                 }
             }
 
-            if (here.Count == 0 && anywhere.Count == 0)
+            List<PredictiveSuggestion> ranked = new List<PredictiveSuggestion>(Limit);
+
+            foreach (List<PredictiveSuggestion> bucket in new[] { hereOpening, hereInside, anywhereOpening, anywhereInside })
+            {
+                foreach (PredictiveSuggestion suggestion in bucket)
+                {
+                    if (ranked.Count == Limit)
+                    {
+                        break;
+                    }
+
+                    ranked.Add(suggestion);
+                }
+            }
+
+            if (ranked.Count == 0)
             {
                 return default;
             }
 
-            here.AddRange(anywhere);
-
-            return new SuggestionPackage(here);
+            return new SuggestionPackage(ranked);
         }
 
         public bool CanAcceptFeedback(PredictionClient client, PredictorFeedbackKind feedback) => false;
@@ -103,11 +130,15 @@ namespace ContextHistoryPredictor
 
         private const int MaximumExtension = 5;
 
+        private const string AncestorMark = "|";
+
         private static readonly Guid _id = new Guid(Identifier);
 
         private static readonly object _gate = new object();
 
         private static readonly char[] _trimmed = { '"', '\'', ',', ';', '(', ')', '`' };
+
+        private static readonly string[] _executable = { ".exe", ".cmd", ".bat", ".ps1", ".com" };
 
         private static string[] _lines = Array.Empty<string>();
 
@@ -168,29 +199,36 @@ namespace ContextHistoryPredictor
             using (FileStream stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
             using (StreamReader reader = new StreamReader(stream))
             {
-                bool skipping = false;
+                string? pending = null;
                 string? line;
 
                 while ((line = reader.ReadLine()) != null)
                 {
                     bool continued = line.EndsWith("`", StringComparison.Ordinal);
+                    string body = continued ? line.Substring(0, line.Length - 1) : line;
 
-                    if (skipping)
+                    if (pending != null)
                     {
-                        skipping = continued;
-                        continue;
+                        body = pending.TrimEnd() + " " + body.TrimStart();
                     }
 
                     if (continued)
                     {
-                        skipping = true;
+                        pending = body;
                         continue;
                     }
 
-                    if (line.Length != 0)
+                    pending = null;
+
+                    if (body.Length != 0)
                     {
-                        lines.Add(line);
+                        lines.Add(body);
                     }
+                }
+
+                if (pending != null && pending.Length != 0)
+                {
+                    lines.Add(pending);
                 }
             }
 
@@ -211,6 +249,22 @@ namespace ContextHistoryPredictor
 
                 int start = index;
 
+                if (index < line.Length && (line[index] == '"' || line[index] == '\''))
+                {
+                    char quote = line[index];
+                    index++;
+
+                    while (index < line.Length && line[index] != quote)
+                    {
+                        index++;
+                    }
+
+                    if (index < line.Length)
+                    {
+                        index++;
+                    }
+                }
+
                 while (index < line.Length && !char.IsWhiteSpace(line[index]))
                 {
                     index++;
@@ -230,7 +284,10 @@ namespace ContextHistoryPredictor
 
                 if (Exists(token, location, probed))
                 {
-                    reach = Reach.Here;
+                    if (!Path.IsPathRooted(token))
+                    {
+                        reach = Reach.Here;
+                    }
                 }
                 else if (MustBeAPath(token, location, probed))
                 {
@@ -316,7 +373,7 @@ namespace ContextHistoryPredictor
 
             while (slash > 0)
             {
-                if (Exists(token.Substring(0, slash), location, probed))
+                if (Exists(token.Substring(0, slash), location, probed, false))
                 {
                     return true;
                 }
@@ -327,9 +384,11 @@ namespace ContextHistoryPredictor
             return false;
         }
 
-        private static bool Exists(string token, string location, Dictionary<string, bool> probed)
+        private static bool Exists(string token, string location, Dictionary<string, bool> probed, bool executable = true)
         {
-            if (probed.TryGetValue(token, out bool known))
+            string key = executable ? token : AncestorMark + token;
+
+            if (probed.TryGetValue(key, out bool known))
             {
                 return known;
             }
@@ -340,6 +399,18 @@ namespace ContextHistoryPredictor
             {
                 string full = Path.IsPathRooted(token) ? token : Path.Combine(location, token);
                 found = File.Exists(full) || Directory.Exists(full);
+
+                if (!found && executable && !HasFileExtension(token))
+                {
+                    foreach (string extension in _executable)
+                    {
+                        if (File.Exists(full + extension))
+                        {
+                            found = true;
+                            break;
+                        }
+                    }
+                }
             }
             catch (ArgumentException)
             {
@@ -348,7 +419,7 @@ namespace ContextHistoryPredictor
             {
             }
 
-            probed[token] = found;
+            probed[key] = found;
 
             return found;
         }

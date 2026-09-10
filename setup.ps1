@@ -37,6 +37,10 @@ function Install-Tool($id, $command) {
 
     Write-Host "  installing $id"
     winget install --exact --id $id --accept-source-agreements --accept-package-agreements --silent
+
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning "  $id failed, winget exited $LASTEXITCODE"
+    }
 }
 
 function Install-GalleryModule($name) {
@@ -87,7 +91,7 @@ function Build-Predictor {
         Copy-Item $output $target -Force -ErrorAction Stop
     }
     catch [System.IO.IOException] {
-        Move-Item $deployed "$deployed.old" -Force
+        Move-Item $deployed "$deployed.$([DateTime]::UtcNow.Ticks).old" -Force
         Copy-Item $output $target -Force
         Write-Host '  swapped the dll out from under the shells that had it open'
     }
@@ -128,7 +132,7 @@ function Install-File($source, $target) {
     }
     catch {
         Copy-Item $source $target -Force
-        Write-Warning "  could not link, copied instead (turn on Developer Mode for links)"
+        Write-Warning "  copied instead of linking: $($_.Exception.Message)"
     }
 }
 

@@ -4,7 +4,15 @@ if (-not (Test-Path $path)) { return }
 if ((Get-Item $path).Length -lt 1MB) { return }
 if (Get-Process pwsh, powershell -ErrorAction Ignore | Where-Object { $_.Id -ne $PID }) { return }
 
-$lines = Get-Content $path
+try {
+    $lines = Get-Content $path -ErrorAction Stop
+}
+catch {
+    return
+}
+
+if (-not $lines) { return }
+
 $counts = @{}
 
 foreach ($line in $lines) {
@@ -13,6 +21,8 @@ foreach ($line in $lines) {
 
 $recent = [Collections.Generic.HashSet[string]]::new([string[]] ($lines | Select-Object -Last 1000))
 $kept = $lines | Where-Object { $counts[$_] -ge 2 -or $recent.Contains($_) }
+
+if (-not $kept) { return }
 
 Copy-Item $path "$path.bak" -Force
 $kept | Set-Content $path -Encoding utf8
