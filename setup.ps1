@@ -81,15 +81,21 @@ function Build-Predictor {
 
     New-Item -ItemType Directory -Force -Path $target | Out-Null
 
+    Get-ChildItem $target -Filter *.old -ErrorAction Ignore | Remove-Item -Force -ErrorAction Ignore
+
     try {
         Copy-Item $output $target -Force -ErrorAction Stop
-        Copy-Item (Join-Path $source 'ContextHistoryPredictor.psm1') $target -Force
-        Copy-Item (Join-Path $source 'ContextHistoryPredictor.psd1') $target -Force
-        Write-Host "  built and placed in $target"
     }
     catch [System.IO.IOException] {
-        Write-Warning '  another shell has the module loaded, close every PowerShell window and run this again'
+        Move-Item $deployed "$deployed.old" -Force
+        Copy-Item $output $target -Force
+        Write-Host '  swapped the dll out from under the shells that had it open'
     }
+
+    Copy-Item (Join-Path $source 'ContextHistoryPredictor.psm1') $target -Force
+    Copy-Item (Join-Path $source 'ContextHistoryPredictor.psd1') $target -Force
+
+    Write-Host "  built and placed in $target"
 }
 
 function Install-File($source, $target) {
