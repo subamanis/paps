@@ -68,6 +68,6 @@ That filter looks for `password|asplaintext|token|apikey|secret` in assignment o
 
 Cost: 1 ms on a valid command, 20 ms on a typo.
 
-## docs/cheatsheet.md
+## cheatsheet.md
 
 Commands and shortcuts.

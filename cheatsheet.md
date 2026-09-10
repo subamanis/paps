@@ -12,9 +12,9 @@
 | `lt` | Directory tree, 2 levels |
 
 ```
-z mezura
+z myproject
 cdd
-cdd mezura
+cdd docs
 ```
 
 ## Search
@@ -26,8 +26,8 @@ cdd mezura
 | `fzf` | Interactive fuzzy pick from a list |
 
 ```
-rg "parse_lines" .
-fd "Cargo.toml"
+rg "TODO" .
+fd config
 ```
 
 ## Files
@@ -41,7 +41,7 @@ fd "Cargo.toml"
 ```
 open
 open readme
-bat src/parser.rs
+bat src/main.rs
 ```
 
 ## Shortcuts
