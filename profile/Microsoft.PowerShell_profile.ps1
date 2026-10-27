@@ -126,6 +126,21 @@ Set-PSReadLineKeyHandler -Key Alt+c -ScriptBlock {
     }
 }
 
+# --------------------------------------------
+# make psreadline follow terminal theme
+# --------------------------------------------
+
+Set-PSReadLineOption -Colors @{
+    Default                = "`e[39m"
+    Type                   = "`e[39m"
+    Member                 = "`e[39m"
+    Number                 = "`e[39m"
+    ContinuationPrompt     = "`e[39m"
+    InlinePrediction       = "`e[90;3m"
+    ListPredictionTooltip  = "`e[90;3m"
+    ListPredictionSelected = "`e[48;5;238;97m"
+}
+
 
 # --------------------------------------------
 # custom shortcuts
