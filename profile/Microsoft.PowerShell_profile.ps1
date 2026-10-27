@@ -2,6 +2,10 @@
 # PowerShell 7 Profile
 # ============================================
 
+if ([Console]::IsInputRedirected -or [Console]::IsOutputRedirected -or ([Environment]::GetCommandLineArgs() -match '^-(c|command|encodedcommand|ec|file|f|noninteractive)$')) {
+    return
+}
+
 
 # --------------------------------------------
 # Command history / predictions
